@@ -17,6 +17,7 @@ targets:
       - path: MisgKeyboard
     settings:
       base:
+        GENERATE_INFOPLIST_FILE: YES
         PRODUCT_BUNDLE_IDENTIFIER: app.misg.keyboard
         INFOPLIST_KEY_CFBundleDisplayName: Misg Keyboard
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.utilities
@@ -33,6 +34,7 @@ targets:
       - path: KeyboardExtension
     settings:
       base:
+        GENERATE_INFOPLIST_FILE: YES
         PRODUCT_BUNDLE_IDENTIFIER: app.misg.keyboard.KeyboardExtension
         INFOPLIST_KEY_CFBundleDisplayName: Misg Keyboard
         INFOPLIST_KEY_NSExtension_NSExtensionPointIdentifier: com.apple.keyboard-service
