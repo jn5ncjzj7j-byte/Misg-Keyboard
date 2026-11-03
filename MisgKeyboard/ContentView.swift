@@ -1,16 +1,18 @@
 import SwiftUI
+import UIKit
 
 struct ContentView: View {
     @StateObject private var store = KeyboardStore.shared
+    @Environment(\.scenePhase) private var scenePhase
     @State private var newClip = ""
     @State private var search = ""
     @State private var darkMode = true
+    @State private var copiedID: UUID?
 
     private var filtered: [KeyboardClip] {
-        let values = store.clips.filter {
+        store.clips.filter {
             search.isEmpty || $0.text.localizedCaseInsensitiveContains(search)
         }
-        return values.sorted { $0.pinned == $1.pinned ? $0.createdAt > $1.createdAt : $0.pinned && !$1.pinned }
     }
 
     var body: some View {
@@ -48,35 +50,54 @@ struct ContentView: View {
                     }
                     .padding(12)
                     .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14))
-                    List {
-                        ForEach(filtered) { clip in
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text(clip.text).textSelection(.enabled)
-                                HStack {
-                                    Button {
-                                        UIPasteboard.general.string = clip.text
-                                    } label: {
-                                        Label("Copy", systemImage: "doc.on.doc")
-                                    }
-                                    Spacer()
-                                    Button {
-                                        store.togglePin(clip)
-                                    } label: {
-                                        Image(systemName: clip.pinned ? "pin.fill" : "pin")
-                                    }
-                                    Button(role: .destructive) {
-                                        store.delete(clip)
-                                    } label: {
-                                        Image(systemName: "trash")
-                                    }
-                                }
-                                .font(.caption)
+
+                    ScrollView {
+                        LazyVStack(spacing: 10) {
+                            if filtered.isEmpty {
+                                Text(search.isEmpty ? "No saved clips yet" : "No matching clips")
+                                    .foregroundStyle(.secondary)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.top, 28)
                             }
-                            .listRowBackground(Color.white.opacity(darkMode ? 0.055 : 0.7))
+                            ForEach(filtered) { clip in
+                                VStack(alignment: .leading, spacing: 12) {
+                                    Text(clip.text)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .textSelection(.enabled)
+                                    HStack {
+                                        Button {
+                                            UIPasteboard.general.string = clip.text
+                                            copiedID = clip.id
+                                        } label: {
+                                            Label(copiedID == clip.id ? "Copied" : "Copy",
+                                                  systemImage: copiedID == clip.id ? "checkmark" : "doc.on.doc")
+                                        }
+                                        Spacer()
+                                        Button {
+                                            store.togglePin(clip)
+                                            copiedID = nil
+                                        } label: {
+                                            Label(clip.pinned ? "Unpin" : "Pin",
+                                                  systemImage: clip.pinned ? "pin.fill" : "pin")
+                                        }
+                                        Button(role: .destructive) {
+                                            store.delete(clip)
+                                            if copiedID == clip.id { copiedID = nil }
+                                        } label: {
+                                            Image(systemName: "trash")
+                                        }
+                                    }
+                                    .font(.caption.weight(.medium))
+                                    .buttonStyle(.borderless)
+                                }
+                                .padding(14)
+                                .background(Color.white.opacity(darkMode ? 0.055 : 0.7),
+                                            in: RoundedRectangle(cornerRadius: 16))
+                            }
                         }
+                        .padding(.vertical, 2)
                     }
-                    .scrollContentBackground(.hidden)
-                    .listStyle(.plain)
+
                     VStack(alignment: .leading, spacing: 8) {
                         Label("Enable your keyboard", systemImage: "keyboard")
                             .font(.headline)
@@ -99,6 +120,12 @@ struct ContentView: View {
                     } label: {
                         Image(systemName: darkMode ? "sun.max" : "moon")
                     }
+                }
+            }
+            .onChange(of: scenePhase) { phase in
+                if phase == .active {
+                    store.load()
+                    copiedID = nil
                 }
             }
         }
