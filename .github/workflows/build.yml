@@ -1,0 +1,41 @@
+name: Build Misg Keyboard IPA
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Build archive
+        run: |
+          xcodebuild -project MisgKeyboard.xcodeproj \
+            -scheme MisgKeyboard \
+            -configuration Release \
+            -sdk iphoneos \
+            -archivePath "$RUNNER_TEMP/MisgKeyboard.xcarchive" \
+            CODE_SIGNING_ALLOWED=NO archive
+
+      - name: Package IPA
+        run: |
+          mkdir -p Payload
+          cp -R "$RUNNER_TEMP/MisgKeyboard.xcarchive/Products/Applications/MisgKeyboard.app" Payload/
+          /usr/bin/zip -r MisgKeyboard.ipa Payload
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: Misg-Keyboard-IPA
+          path: MisgKeyboard.ipa
+          retention-days: 14
