@@ -1,4 +1,5 @@
 import Foundation
+import Combine
 
 struct KeyboardClip: Identifiable, Codable, Equatable {
     var id: UUID
@@ -27,37 +28,51 @@ final class KeyboardStore: ObservableObject {
     }
 
     func load() {
-        guard let data = defaults.data(forKey: key),
-              let decoded = try? JSONDecoder().decode([KeyboardClip].self, from: data) else {
+        guard let data = defaults.data(forKey: key) else {
             clips = []
             return
         }
-        clips = decoded.sorted { $0.pinned == $1.pinned ? $0.createdAt > $1.createdAt : $0.pinned && !$1.pinned }
+        do {
+            let decoded = try JSONDecoder().decode([KeyboardClip].self, from: data)
+            clips = ordered(decoded)
+        } catch {
+            return
+        }
     }
 
     func add(_ text: String) {
         let value = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !value.isEmpty else { return }
-        clips.insert(KeyboardClip(text: value), at: 0)
-        save()
+        var updated = clips
+        updated.insert(KeyboardClip(text: value), at: 0)
+        persist(updated)
     }
 
     func togglePin(_ clip: KeyboardClip) {
-        guard let index = clips.firstIndex(where: { $0.id == clip.id }) else { return }
-        clips[index].pinned.toggle()
-        save()
+        guard var current = clips.first(where: { $0.id == clip.id }) else { return }
+        current.pinned.toggle()
+        var updated = clips
+        guard let index = updated.firstIndex(where: { $0.id == clip.id }) else { return }
+        updated[index] = current
+        persist(updated)
     }
 
     func delete(_ clip: KeyboardClip) {
-        clips.removeAll { $0.id == clip.id }
-        save()
+        persist(clips.filter { $0.id != clip.id })
     }
 
-    private func save() {
-        clips.sort { $0.pinned == $1.pinned ? $0.createdAt > $1.createdAt : $0.pinned && !$1.pinned }
-        if let data = try? JSONEncoder().encode(clips) {
-            defaults.set(data, forKey: key)
+    private func ordered(_ values: [KeyboardClip]) -> [KeyboardClip] {
+        values.sorted {
+            if $0.pinned != $1.pinned { return $0.pinned && !$1.pinned }
+            return $0.createdAt > $1.createdAt
         }
-        objectWillChange.send()
+    }
+
+    private func persist(_ values: [KeyboardClip]) {
+        let sorted = ordered(values)
+        guard let data = try? JSONEncoder().encode(sorted) else { return }
+        defaults.set(data, forKey: key)
+        defaults.synchronize()
+        clips = sorted
     }
 }
